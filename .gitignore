@@ -43,3 +43,8 @@ desktop.ini
 # ── Logs ───────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# Claude Code local config
+.claude/
+
+PROGRESS.md
