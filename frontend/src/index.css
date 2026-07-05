@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --c-surface: #E7E5E4;
+    --c-primary: #006666;
+    --c-primary-dark: #004d4d;
+    --c-primary-light: #e0efef;
+    --c-text: #1E2938;
+    --c-muted: #5a6a7a;
+    --c-success: #00A63D;
+    --c-warning: #FE9900;
+    --c-danger: #FF2157;
+    --shadow-d: #C8C6C5;
+    --shadow-l: #FFFFFF;
+  }
+
+  body {
+    background-color: var(--c-surface);
+    color: var(--c-text);
+    font-family: 'Space Mono', 'JetBrains Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ── Skill tag entrance: extrudes from the surface like a neumorphic element ── */
+@keyframes neu-extrude {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) translateY(6px);
+    box-shadow: 0 0 0 #C8C6C5, 0 0 0 #FFFFFF;
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08) translateY(-2px);
+    box-shadow: 5px 5px 11px #C8C6C5, -5px -5px 11px #FFFFFF;
+  }
+  80% {
+    transform: scale(0.97) translateY(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    box-shadow: 3px 3px 7px #C8C6C5, -3px -3px 7px #FFFFFF;
+  }
+}
+
+/* Card container slides up and fades in */
+@keyframes neu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-neu-extrude {
+  animation: neu-extrude 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-neu-rise {
+  animation: neu-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@layer utilities {
+  /* Raised — element pops out of the surface */
+  .neu-raised {
+    box-shadow: 6px 6px 14px #C8C6C5, -6px -6px 14px #FFFFFF;
+  }
+  .neu-raised-sm {
+    box-shadow: 3px 3px 7px #C8C6C5, -3px -3px 7px #FFFFFF;
+  }
+  .neu-raised-lg {
+    box-shadow: 10px 10px 24px #C8C6C5, -10px -10px 24px #FFFFFF;
+  }
+
+  /* Pressed — element is inset into the surface */
+  .neu-pressed {
+    box-shadow: inset 4px 4px 9px #C8C6C5, inset -4px -4px 9px #FFFFFF;
+  }
+  .neu-pressed-sm {
+    box-shadow: inset 2px 2px 5px #C8C6C5, inset -2px -2px 5px #FFFFFF;
+  }
+
+  /* Teal surface variant (for primary action cards) */
+  .neu-teal {
+    box-shadow: 6px 6px 14px #004747, -6px -6px 14px #339999;
+  }
+  .neu-teal-sm {
+    box-shadow: 3px 3px 7px #004747, -3px -3px 7px #339999;
+  }
+  .neu-teal-pressed {
+    box-shadow: inset 3px 3px 7px #004040, inset -3px -3px 7px #008c8c;
+  }
+}
