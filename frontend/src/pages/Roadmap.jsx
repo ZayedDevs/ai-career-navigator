@@ -18,10 +18,107 @@ const PHASE_ACCENT = {
   3: { color: 'var(--c-primary)', hex: '#006666', dim: 'rgba(0,102,102,0.12)' },
 }
 
-/* ── Resource accordion ── */
-function ResourceList({ resources }) {
+const PLATFORM_BADGE = {
+  udemy:    { color: '#7C3AED', dim: 'rgba(124,58,237,0.12)' },
+  coursera: { color: '#2563EB', dim: 'rgba(37,99,235,0.12)' },
+}
+
+const TIERS = [
+  { key: 'free',     emoji: '🆓', label: 'Free'     },
+  { key: 'udemy',    emoji: '💰', label: 'Udemy'    },
+  { key: 'coursera', emoji: '🎓', label: 'Coursera' },
+]
+
+function renderStars(rating) {
+  if (rating == null) return null
+  return `⭐ ${rating.toFixed(1)}`
+}
+
+function normalizeResources(resources) {
+  if (Array.isArray(resources)) {
+    return { free: resources, udemy: [], coursera: [] }
+  }
+  return {
+    free: resources?.free ?? [],
+    udemy: resources?.udemy ?? [],
+    coursera: resources?.coursera ?? [],
+  }
+}
+
+/* ── Single resource card ── */
+function ResourceCard({ resource: r, tier }) {
+  const badge = PLATFORM_BADGE[tier]
+  return (
+    <a
+      href={r.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex gap-3 rounded-xl p-2 transition-all neu-pressed-sm"
+      style={{ backgroundColor: 'var(--c-surface)' }}
+    >
+      {tier === 'free' && r.thumbnail && (
+        <img
+          src={r.thumbnail}
+          alt={r.title}
+          className="h-10 w-16 shrink-0 rounded-lg object-cover"
+        />
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs font-bold line-clamp-2" style={{ color: 'var(--c-text)' }}>
+            {r.title}
+          </p>
+          {badge && (
+            <span
+              className="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: badge.color, backgroundColor: badge.dim }}
+            >
+              {r.platform}
+            </span>
+          )}
+        </div>
+        {tier === 'free' && (
+          <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
+            {r.channel} · {r.platform}
+          </p>
+        )}
+        {tier === 'udemy' && (
+          <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
+            {[renderStars(r.rating), r.difficulty].filter(Boolean).join(' · ')}
+          </p>
+        )}
+        {tier === 'coursera' && (
+          <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
+            {[r.organization, renderStars(r.rating), r.duration].filter(Boolean).join(' · ')}
+          </p>
+        )}
+      </div>
+    </a>
+  )
+}
+
+/* ── One tier (Free / Udemy / Coursera) ── */
+function TierBlock({ emoji, label, items, tier }) {
+  if (!items?.length) return null
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--c-muted)' }}>
+        {emoji} {label}
+      </p>
+      <div className="flex flex-col gap-2">
+        {items.map((r, i) => (
+          <ResourceCard key={i} resource={r} tier={tier} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/* ── Resource accordion (all tiers) ── */
+function ResourceSection({ free, udemy, coursera, totalCount }) {
   const [open, setOpen] = useState(false)
-  if (!resources?.length) return null
+  if (!totalCount) return null
+  const byTier = { free, udemy, coursera }
   return (
     <div className="border-t mt-3 pt-3" style={{ borderColor: 'rgba(0,0,0,0.07)' }}>
       <button
@@ -29,7 +126,7 @@ function ResourceList({ resources }) {
         className="flex w-full items-center justify-between text-xs font-bold uppercase tracking-widest transition-colors"
         style={{ color: 'var(--c-muted)' }}
       >
-        <span>Resources ({resources.length})</span>
+        <span>Resources ({totalCount})</span>
         <span
           className="transition-transform duration-200"
           style={{ display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}
@@ -38,32 +135,9 @@ function ResourceList({ resources }) {
         </span>
       </button>
       {open && (
-        <div className="mt-2 flex flex-col gap-2">
-          {resources.map((r, i) => (
-            <a
-              key={i}
-              href={r.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex gap-3 rounded-xl p-2 transition-all neu-pressed-sm"
-              style={{ backgroundColor: 'var(--c-surface)' }}
-            >
-              {r.thumbnail && (
-                <img
-                  src={r.thumbnail}
-                  alt={r.title}
-                  className="h-10 w-16 shrink-0 rounded-lg object-cover"
-                />
-              )}
-              <div className="min-w-0">
-                <p className="text-xs font-bold line-clamp-2" style={{ color: 'var(--c-text)' }}>
-                  {r.title}
-                </p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--c-muted)' }}>
-                  {r.channel} · {r.platform}
-                </p>
-              </div>
-            </a>
+        <div className="mt-2 flex flex-col gap-3">
+          {TIERS.map(({ key, emoji, label }) => (
+            <TierBlock key={key} emoji={emoji} label={label} items={byTier[key]} tier={key} />
           ))}
         </div>
       )}
@@ -74,6 +148,8 @@ function ResourceList({ resources }) {
 /* ── Skill card ── */
 function SkillCard({ skill, learned, marking, onMark, phaseColor, index }) {
   const priority = PRIORITY[skill.priority] ?? PRIORITY.low
+  const { free, udemy, coursera } = normalizeResources(skill.resources)
+  const totalCount = skill.resource_count?.total ?? (free.length + udemy.length + coursera.length)
   return (
     <div
       className="rounded-xl overflow-hidden transition-all animate-neu-rise"
@@ -140,7 +216,7 @@ function SkillCard({ skill, learned, marking, onMark, phaseColor, index }) {
             </span>
           </div>
 
-          <ResourceList resources={skill.resources} />
+          <ResourceSection free={free} udemy={udemy} coursera={coursera} totalCount={totalCount} />
         </div>
       </div>
     </div>

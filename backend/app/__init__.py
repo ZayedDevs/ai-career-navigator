@@ -28,6 +28,7 @@ def create_app():
     from .routes.auth_routes import auth_bp
     from .routes.dashboard_routes import dashboard_bp
     from .routes.chat_routes import chat_bp
+    from .routes.cv_routes import cv_bp
 
     app.register_blueprint(resume_bp,     url_prefix="/api/resume")
     app.register_blueprint(gap_bp,        url_prefix="/api/gap")
@@ -36,6 +37,7 @@ def create_app():
     app.register_blueprint(auth_bp,       url_prefix="/api/auth")
     app.register_blueprint(dashboard_bp,  url_prefix="/api/dashboard")
     app.register_blueprint(chat_bp,       url_prefix="/api/chat")
+    app.register_blueprint(cv_bp,         url_prefix="/api/cv")
 
     # ─── Health check route ───────────────────────────────────────────
     @app.route("/api/health")

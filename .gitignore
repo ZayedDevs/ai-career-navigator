@@ -52,3 +52,6 @@ PROGRESS.md
 PROGRESS.md
 
 PROGRESS.md
+
+# Raw course datasets (too large for GitHub)
+backend/data/courses/*_raw.csv

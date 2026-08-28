@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 
 from .skill_tier import classify_skill
 from .youtube_fetcher import get_youtube_resources
+from .course_matcher import get_courses_for_skill
 
 """
 Purpose:
@@ -116,19 +117,39 @@ def _enrich_skill(skill_data: dict, include_resources: bool = True) -> dict:
     else:
         enriched["priority"] = "low"
 
-    # Optionally fetch YouTube resources (uses cache)
+        # Fetch all resource types (YouTube free + Udemy + Coursera paid)
     if include_resources:
         try:
-            videos = get_youtube_resources(skill_name)
-            enriched["resources"] = videos
-            enriched["resource_count"] = len(videos)
+            # Free: YouTube videos (cached in MongoDB)
+            youtube_videos = get_youtube_resources(skill_name)
         except Exception as e:
-            print(f"WARNING: Failed to fetch resources for '{skill_name}': {e}")
-            enriched["resources"] = []
-            enriched["resource_count"] = 0
+            print(f"⚠️ YouTube fetch failed for '{skill_name}': {e}")
+            youtube_videos = []
+
+        try:
+            # Paid: Udemy + Coursera from pre-built database
+            paid_courses = get_courses_for_skill(skill_name, max_udemy=2, max_coursera=2)
+            udemy_courses = paid_courses.get("udemy", [])
+            coursera_courses = paid_courses.get("coursera", [])
+        except Exception as e:
+            print(f"⚠️ Course lookup failed for '{skill_name}': {e}")
+            udemy_courses = []
+            coursera_courses = []
+
+        enriched["resources"] = {
+            "free": youtube_videos,          # YouTube (always shown first)
+            "udemy": udemy_courses,           # Paid Udemy courses
+            "coursera": coursera_courses,     # Coursera specializations
+        }
+        enriched["resource_count"] = {
+            "free": len(youtube_videos),
+            "udemy": len(udemy_courses),
+            "coursera": len(coursera_courses),
+            "total": len(youtube_videos) + len(udemy_courses) + len(coursera_courses),
+        }
     else:
-        enriched["resources"] = []
-        enriched["resource_count"] = 0
+        enriched["resources"] = {"free": [], "udemy": [], "coursera": []}
+        enriched["resource_count"] = {"free": 0, "udemy": 0, "coursera": 0, "total": 0}
 
     return enriched
 
