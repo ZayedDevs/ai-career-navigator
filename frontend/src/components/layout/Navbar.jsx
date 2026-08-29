@@ -48,6 +48,7 @@ export default function Navbar() {
           {/* Main nav */}
           <NavLink to="/upload" className={navLinkClass}>Upload</NavLink>
           <NavLink to="/dashboard" className={navLinkClass}>Dashboard</NavLink>
+          <NavLink to="/cv-builder" className={navLinkClass}>CV Builder</NavLink>
 
           <NavLink to="/ask" className={navLinkClass}>Ask AI Tutor</NavLink>
 

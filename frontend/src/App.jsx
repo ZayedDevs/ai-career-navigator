@@ -9,6 +9,7 @@ import Gap from './pages/Gap'
 import Predict from './pages/Predict'
 import Roadmap from './pages/Roadmap'
 import Dashboard from './pages/Dashboard'
+import CVBuilder from './pages/CVBuilder'
 import MyCourses from './pages/MyCourses'
 import MyRoadmaps from './pages/MyRoadmaps'
 import AskTutor from './pages/AskTutor'
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/predict" element={<ProtectedRoute><Predict /></ProtectedRoute>} />
           <Route path="/roadmap" element={<ProtectedRoute><Roadmap /></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+          <Route path="/cv-builder" element={<ProtectedRoute><CVBuilder /></ProtectedRoute>} />
           <Route path="/my-learning/courses" element={<ProtectedRoute><MyCourses /></ProtectedRoute>} />
           <Route path="/my-learning/roadmaps" element={<ProtectedRoute><MyRoadmaps /></ProtectedRoute>} />
           <Route path="/ask" element={<ProtectedRoute><AskTutor /></ProtectedRoute>} />
