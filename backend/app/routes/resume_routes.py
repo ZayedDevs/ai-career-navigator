@@ -2,10 +2,13 @@
 import os
 import uuid
 from flask import Blueprint, request, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 
 from ..services.resume_parser import parse_resume
 from ..services.skill_extractor import extract_skills
+from ..services.cv_profile_extractor import extract_cv_profile
+from ..utils.db import get_collection
 from ..utils.response_helper import success_response, error_response
 
 """
@@ -59,6 +62,7 @@ def get_upload_folder() -> str:
 # ============================================================================
 
 @resume_bp.route("/upload", methods=["POST"])
+@jwt_required(optional=True)
 def upload_resume():
     """
     Upload a resume file (PDF or DOCX) and get extracted skills.
@@ -151,6 +155,29 @@ def upload_resume():
 
         # ─── 6. Extract skills ───────────────────────────────────────────
         extract_result = extract_skills(parse_result["text"])
+
+        # ─── 6b. Persist an autofill draft for the CV Builder (best-effort) ──
+        # Non-fatal: a Mongo hiccup here must never break the upload response.
+        user_id = get_jwt_identity()
+        if user_id:
+            try:
+                extracted_profile = extract_cv_profile(
+                    parse_result["text"], extract_result["skills"]
+                )
+                if "error" not in extracted_profile:
+                    get_collection("resume_extracts").replace_one(
+                        {"user_id": user_id},
+                        {
+                            "user_id":         user_id,
+                            "personal":        extracted_profile["personal"],
+                            "skills":          extracted_profile["skills"],
+                            "source_filename": original_name,
+                            "extracted_at":    extracted_profile["extracted_at"],
+                        },
+                        upsert=True,
+                    )
+            except Exception:
+                current_app.logger.exception("Failed to persist resume_extracts draft")
 
         # ─── 7. Build successful response ────────────────────────────────
         data = {

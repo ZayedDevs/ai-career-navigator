@@ -2,10 +2,11 @@
 CV Builder API routes.
 
 Endpoints:
-    GET    /api/cv/profile   → get saved CV profile
-    POST   /api/cv/profile   → save / update CV profile
-    POST   /api/cv/extract   → extract personal info from resume text
-    PATCH  /api/cv/skills    → sync active_skills → CV profile skills
+    GET    /api/cv/profile         → get saved CV profile
+    POST   /api/cv/profile         → save / update CV profile
+    POST   /api/cv/extract         → extract personal info from resume text
+    GET    /api/cv/skills          → get user's active_skills (learned via roadmap)
+    GET    /api/cv/autofill-draft  → get extracted draft from last resume upload
 """
 
 from flask import Blueprint, request, current_app
@@ -240,78 +241,68 @@ def extract_from_resume():
 
 
 # ============================================================================
-# PATCH /api/cv/skills
+# GET /api/cv/skills
 # ============================================================================
 
-@cv_bp.route("/skills", methods=["PATCH"])
+@cv_bp.route("/skills", methods=["GET"])
 @jwt_required()
-def sync_skills():
+def get_active_skills():
     """
-    Merge the user's roadmap-learned skills into their CV profile.
-    Called when the user opens the CV Builder page.
+    Get the user's roadmap-learned skills (active_skills).
 
-    Compares user.active_skills (from progress tracking) against
-    cv_profile.skills and adds any that are missing.
-
-    Returns:
-    {
-        "skills":        [...full merged list...],
-        "new_additions": [...skills added this sync...]
-    }
+    Read-only — does NOT touch the CV profile. The frontend uses this to
+    surface skills the user hasn't yet added to their CV as suggestions;
+    adding a skill to the CV is always an explicit user action.
     """
     try:
         user_id = get_jwt_identity()
 
-        # Get user's current active_skills (learned via roadmap)
         users_coll = get_collection("users")
         user = users_coll.find_one({"_id": ObjectId(user_id)})
 
         if not user:
             return error_response("User not found.", 404)
 
-        active_skills = user.get("active_skills", [])
-
-        # Get current CV profile skills
-        coll = _get_coll()
-        profile = coll.find_one({"user_id": user_id})
-
-        if not profile:
-            # No profile yet — just return the active_skills as-is
-            return success_response(
-                data={
-                    "skills":        sorted(active_skills),
-                    "new_additions": [],
-                },
-                message="No CV profile found. Upload a resume to get started.",
-            )
-
-        original_skills = profile.get("skills", [])
-        merged_skills   = sorted(set(original_skills + active_skills))
-        new_additions   = sorted(
-            set(active_skills) - set(original_skills)
-        )
-
-        # Persist merged skills
-        coll.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "skills":       merged_skills,
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-            }}
-        )
-
         return success_response(
-            data={
-                "skills":        merged_skills,
-                "new_additions": new_additions,
-            },
-            message=(
-                f"{len(new_additions)} new skill(s) added from your roadmap."
-                if new_additions
-                else "Skills are already up to date."
-            ),
+            data={"active_skills": sorted(user.get("active_skills", []))},
+            message="Active skills retrieved.",
         )
 
     except Exception as e:
-        current_app.logger.exception("PATCH /api/cv/skills failed")
+        current_app.logger.exception("GET /api/cv/skills failed")
+        return error_response(str(e), 500)
+
+
+# ============================================================================
+# GET /api/cv/autofill-draft
+# ============================================================================
+
+@cv_bp.route("/autofill-draft", methods=["GET"])
+@jwt_required()
+def get_autofill_draft():
+    """
+    Get the extracted personal info + skills draft from the user's most
+    recent resume upload (see POST /api/resume/upload), for the CV Builder's
+    "Autofill from previous CV" button. Returns null if none exists.
+    """
+    try:
+        user_id = get_jwt_identity()
+
+        doc = get_collection("resume_extracts").find_one({"user_id": user_id})
+
+        if not doc:
+            return success_response(data=None, message="No resume draft found.")
+
+        return success_response(
+            data={
+                "personal":        doc.get("personal", {}),
+                "skills":          doc.get("skills", []),
+                "source_filename": doc.get("source_filename", ""),
+                "extracted_at":    doc.get("extracted_at"),
+            },
+            message="Autofill draft retrieved.",
+        )
+
+    except Exception as e:
+        current_app.logger.exception("GET /api/cv/autofill-draft failed")
         return error_response(str(e), 500)

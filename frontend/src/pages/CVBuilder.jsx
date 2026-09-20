@@ -32,7 +32,7 @@ function Section({ title, children }) {
   )
 }
 
-function TagField({ items, onAdd, onRemove, newBadges = [] }) {
+function TagField({ items, onAdd, onRemove }) {
   const [value, setValue] = useState('')
 
   const add = () => {
@@ -45,12 +45,7 @@ function TagField({ items, onAdd, onRemove, newBadges = [] }) {
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {items.map((item) => (
-          <span key={item} className="relative inline-flex">
-            {newBadges.includes(item) && (
-              <span className="absolute -top-1.5 -right-1.5 text-xs leading-none z-10">✨</span>
-            )}
-            <SkillTag skill={item} removable onRemove={onRemove} />
-          </span>
+          <SkillTag key={item} skill={item} removable onRemove={onRemove} />
         ))}
         {items.length === 0 && (
           <p className="text-xs" style={{ color: 'var(--c-muted)' }}>None yet.</p>
@@ -71,11 +66,36 @@ function TagField({ items, onAdd, onRemove, newBadges = [] }) {
   )
 }
 
+function SuggestedSkills({ suggestions, onAdd }) {
+  if (suggestions.length === 0) return null
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--c-muted)' }}>
+        Suggested from your learning
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {suggestions.map((skill) => (
+          <button
+            key={skill}
+            type="button"
+            onClick={() => onAdd(skill)}
+            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide neu-raised-sm transition-all"
+            style={{ backgroundColor: 'var(--c-surface)', color: 'var(--c-primary)' }}
+          >
+            <span>✨</span>{skill}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function CVBuilder() {
   const { user } = useAuth()
 
   const [profile, setProfile] = useState(null)
-  const [newAdditions, setNewAdditions] = useState([])
+  const [activeSkills, setActiveSkills] = useState([])
+  const [autofillDraft, setAutofillDraft] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState('idle') // idle | saving | saved
   const [exporting, setExporting] = useState(false)
@@ -83,16 +103,21 @@ export default function CVBuilder() {
 
   const dirty = useRef(false)
   const saveTimer = useRef(null)
+  const previewScaleRef = useRef(null)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
       try {
-        const skillsRes = await api.patch('/api/cv/skills')
-        const additions = skillsRes.data.data.new_additions ?? []
-        setNewAdditions(additions)
+        const [skillsRes, draftRes, profileRes] = await Promise.all([
+          api.get('/api/cv/skills').catch(() => null),
+          api.get('/api/cv/autofill-draft').catch(() => null),
+          api.get('/api/cv/profile'),
+        ])
 
-        const profileRes = await api.get('/api/cv/profile')
+        setActiveSkills(skillsRes?.data.data.active_skills ?? [])
+        setAutofillDraft(draftRes?.data.data ?? null)
+
         const fetched = profileRes.data.data
 
         if (fetched) {
@@ -101,7 +126,6 @@ export default function CVBuilder() {
           const blank = emptyProfile()
           blank.personal.name = user?.name ?? ''
           blank.personal.email = user?.email ?? ''
-          blank.skills = skillsRes.data.data.skills ?? []
           setProfile(blank)
         }
       } catch (e) {
@@ -129,12 +153,26 @@ export default function CVBuilder() {
     }, 2000)
 
     return () => clearTimeout(saveTimer.current)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile])
 
   const mutate = (updater) => {
     dirty.current = true
     setProfile((prev) => updater(prev))
+  }
+
+  const handleAutofill = () => {
+    if (!autofillDraft) return
+    mutate((prev) => {
+      const mergedPersonal = { ...prev.personal }
+      for (const [key, value] of Object.entries(autofillDraft.personal || {})) {
+        if (mergedPersonal[key] === '' && value) mergedPersonal[key] = value
+      }
+      return {
+        ...prev,
+        personal: mergedPersonal,
+        skills: Array.from(new Set([...prev.skills, ...(autofillDraft.skills || [])])),
+      }
+    })
   }
 
   const updatePersonal = (field, value) =>
@@ -162,7 +200,14 @@ export default function CVBuilder() {
 
   const handleDownloadPdf = async () => {
     setExporting(true)
+    const scaleWrapper = previewScaleRef.current
+    const prevTransform = scaleWrapper?.style.transform
+    const prevMarginBottom = scaleWrapper?.style.marginBottom
     try {
+      if (scaleWrapper) {
+        scaleWrapper.style.transform = 'none'
+        scaleWrapper.style.marginBottom = '0'
+      }
       const node = document.getElementById('cv-preview-content')
       const canvas = await html2canvas(node, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
       const imgData = canvas.toDataURL('image/png')
@@ -175,6 +220,10 @@ export default function CVBuilder() {
     } catch {
       setError('Failed to generate PDF.')
     } finally {
+      if (scaleWrapper) {
+        scaleWrapper.style.transform = prevTransform ?? ''
+        scaleWrapper.style.marginBottom = prevMarginBottom ?? ''
+      }
       setExporting(false)
     }
   }
@@ -186,6 +235,8 @@ export default function CVBuilder() {
       </div>
     )
   }
+
+  const suggestions = activeSkills.filter((s) => !profile.skills.includes(s))
 
   return (
     <div className="flex flex-col gap-6">
@@ -206,6 +257,11 @@ export default function CVBuilder() {
             >
               {saveStatus === 'saving' ? 'Saving…' : 'Saved ✓'}
             </span>
+          )}
+          {autofillDraft && (
+            <Button variant="secondary" onClick={handleAutofill}>
+              Autofill from previous CV
+            </Button>
           )}
           <Button onClick={handleDownloadPdf} loading={exporting}>
             Download PDF
@@ -242,9 +298,9 @@ export default function CVBuilder() {
           </Section>
 
           <Section title="Skills">
+            <SuggestedSkills suggestions={suggestions} onAdd={(v) => addTag('skills', v)} />
             <TagField
               items={profile.skills}
-              newBadges={newAdditions}
               onAdd={(v) => addTag('skills', v)}
               onRemove={(v) => removeTag('skills', v)}
             />
@@ -364,6 +420,7 @@ export default function CVBuilder() {
             style={{ backgroundColor: 'var(--c-surface)', maxHeight: 'calc(100vh - 3rem)' }}
           >
             <div
+              ref={previewScaleRef}
               style={{
                 transform: 'scale(0.62)',
                 transformOrigin: 'top left',
